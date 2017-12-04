@@ -30,6 +30,11 @@ char * redirects[] = {
   "<"
 };
 
+int oldFDs[] = {
+  STDOUT_FILENO,
+  STDIN_FILENO
+};
+
 //returns the number of builtin commands
 int numBI (){
   return sizeof(bi_commands) / sizeof(char *);
@@ -52,12 +57,12 @@ int my_cd(char **args){
 }
 
 //function for 'exit'
-int my_exit(char **args){
+int my_exit(){
   return 0; //program terminates
 }
 
 //function for 'help'
-int my_help(char **args){
+int my_help(){
   printf("\n||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
   printf("\nWelcome to Angelica's Shell!\n\n");
   printf("These are the instructions for use:\n");
@@ -84,11 +89,17 @@ int count (char *line, char *delim) {
 char * get_line(){ //reading user inpute
   char *input = (char *)calloc(1024, sizeof(char));
   char *line = fgets(input, 1024, stdin);
+
+
+  int length = strlen(input);
+  if (length > 1){
+    input[length-1]= 0;
+  }
+
   if (line == NULL) {
     return 0;
   }
-  int length = strlen(input);
-  input[length-1]= 0;
+
   return input;
 }
 
@@ -128,11 +139,27 @@ static void sighandler(int signo){
   }
 }
 
-int run_redirect(char *file, int *newfd, int fd2){
-  *newfd = dup(fd2);
-  int fd1 = open(file, O_RDWR | O_CREAT, 0666);
-  dup2(fd1, fd2);
-  close(fd1);
+int run_redirect(char **command, int *newfd, int fd2){
+  char * file = command[1];
+  char ** action = delete_spaces(split_line(command[0], " "));
+  int i, status;
+  pid_t parent, child;
+  parent = fork();
+  if (parent < 0) {
+      perror("fork error");
+  } else if (!parent) {// child process
+      *newfd = dup(fd2);
+      int fd1 = open(file, O_RDWR | O_CREAT, 0644);
+      dup2(fd1, fd2);
+      close(fd1);
+      if (execvp(action[0], action) == -1) {
+        perror("execution error");
+        exit(EXIT_FAILURE);
+      }
+  } else { //parent process
+      child = wait(&status);
+    }
+
   return 1;
 }
 
@@ -187,8 +214,10 @@ int run_special(char * line) {
         char * action = redirects[i];
         if (strchr(line, (char)action)) {
           c = split_line(line, action);
-          fd = STDOUT_FILENO;
-          return run_redirect(c[1], &newfd, fd);
+          //printf ("file: %s\n",c[0]);
+          //printf ("action[0]: %s\n",c[0]);
+          return run_redirect(c, &newfd, oldFDs[i]);
+
         }
     }
 
@@ -235,15 +264,19 @@ int command_loop() {
     fprintf(stdout, "angelica's shell:%s$ ", cwd);
     line = get_line();
     if (line == 0) {
-      printf ("\nend of file!\n");
+      printf("\n");
       return 0;
     }
-    num = count (line, ";");
-    args = split_line(line, ";");
-    status = execute(args, num);
+    if (strcmp (line, "\n") != 0) {
+      num = count (line, ";");
+      args = split_line(line, ";");
+      status = execute(args, num);
 
-    free(line);
-    free(args);
+      free(line);
+      free(args);
+  } else {
+    status = 1;
+  }
   } while (status);
   return status;
 }
