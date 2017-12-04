@@ -52,7 +52,7 @@ char ** delete_spaces (char ** args);
 static void sighandler(int signo);
 
 //executes redirect command
-//arguments: string array (output of split_line), int pointer to new file descriptor, int (other file descriptor)
+//arguments: string array (output of split_line), int pointer to new file descriptor, int (old file descriptor  (STDIN or STDOUT))
 int run_redirect(char **command, int *newfd, int fd2);
 
 

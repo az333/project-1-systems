@@ -142,25 +142,17 @@ static void sighandler(int signo){
 int run_redirect(char **command, int *newfd, int fd2){
   char * file = command[1];
   char ** action = delete_spaces(split_line(command[0], " "));
-  int i, status;
-  pid_t parent, child;
-  parent = fork();
-  if (parent < 0) {
-      perror("fork error");
-  } else if (!parent) {// child process
-      *newfd = dup(fd2);
-      int fd1 = open(file, O_RDWR | O_CREAT, 0644);
-      dup2(fd1, fd2);
-      close(fd1);
-      if (execvp(action[0], action) == -1) {
-        perror("execution error");
-        exit(EXIT_FAILURE);
-      }
-  } else { //parent process
-      child = wait(&status);
-    }
+  int fd = open(file, O_RDWR | O_CREAT, 0666);
+  int copy = dup(fd2);
+  dup2(fd,fd2);
+  if (execvp(action[0], action) == -1) {
+    perror("execution error");
+    exit(EXIT_FAILURE);
+  }
+	//fflush(stdout);
+	dup2(copy,fd2);
+	return 1;
 
-  return 1;
 }
 
 int run_pipe (char* input, char* output){
